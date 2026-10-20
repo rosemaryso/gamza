@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>감자 마켓 - 상품 상세 모달 컴포넌트 데모</title>
+  <style>
+    /* ==========================================================================
+       [기본 스타일 & 컬러 변수 (포테이토 브라운 테마)]
+       초보자 가이드: CSS 변수(:root)를 활용하면 브라운 테마 색상을 한곳에서 관리할 수 있습니다.
+       ========================================================================== */
+    :root {
+      /* 포테이토 브라운 대표 컬러셋 */
+      --potato-primary: #8B5A2B;        /* 껍질 느낌의 따뜻하고 묵직한 메인 브라운 */
+      --potato-primary-hover: #724720;  /* 버튼 호버 시 더 짙은 브라운 */
+      --potato-accent: #D97706;         /* 포인트 오렌지 골드 (따뜻한 감자 싹/감자전 색) */
+      --potato-bg-light: #FBF8F3;       /* 감자 속살처럼 부드러운 미색 배경 */
+      --potato-border: #E8DFD5;         /* 부드러운 베이지/브라운 경계선 */
+
+      /* 상태 배지 전용 색상 */
+      --badge-selling-bg: #EBF7EE;      /* 판매중 배경 (연한 연두빛) */
+      --badge-selling-text: #2E7D32;    /* 판매중 텍스트 */
+      --badge-reserved-bg: #FEF3C7;     /* 예약중 배경 (연한 노랑) */
+      --badge-reserved-text: #B45309;   /* 예약중 텍스트 */
+      --badge-sold-bg: #F3F4F6;         /* 거래완료 배경 (회색) */
+      --badge-sold-text: #6B7280;       /* 거래완료 텍스트 */
+
+      /* 텍스트 컬러 */
+      --text-main: #2D241E;             /* 진한 흑갈색 본문 */
+      --text-sub: #786C63;              /* 설명 및 보조 텍스트 */
+      --text-muted: #9E9289;            /* 타임스탬프, 연한 보조 텍스트 */
+    }
+
+    /* 기본 리셋 */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    }
+
+    body {
+      background-color: #F5EFEB;
+      color: var(--text-main);
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* 데모 페이지용 안내 박스 및 열기 버튼 */
+    .demo-container {
+      max-width: 600px;
+      width: 100%;
+      background: #FFFFFF;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(74, 53, 38, 0.08);
+      text-align: center;
+      margin-bottom: 20px;
+      border: 1px solid var(--potato-border);
+    }
+
+    .demo-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--potato-primary);
+      margin-bottom: 12px;
+    }
+
+    .demo-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .demo-btn-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-open-demo {
+      background-color: var(--potato-primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 10px rgba(139, 90, 43, 0.25);
+    }
+
+    .btn-open-demo:hover {
+      background-color: var(--potato-primary-hover);
+      transform: translateY(-1px);
+    }
+
+    /* ==========================================================================
+       [1. 모달 팝업 구조 스타일링]
+       - 뒷배경 딤(오버레이) 및 부드러운 팝업 애니메이션
+       ========================================================================== */
+    /* 모달 전체 오버레이 (바깥 배경) */
+    .potato-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(45, 36, 30, 0.65); /* 따뜻한 흑갈색 톤의 어두운 딤 배경 */
+      backdrop-filter: blur(4px);             /* 뒷배경 살짝 흐림 효과로 집중도 향상 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.25s ease, visibility 0.25s ease;
+      padding: 16px;
+    }
+
+    /* 모달 활성화 클래스 */
+    .potato-modal-overlay.is-active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* 모달 창 본체 컨테이너 */
+    .potato-modal-container {
+      position: relative;
+      width: 100%;
+      max-width: 520px;                       /* 모바일~태블릿에 최적화된 보기 편한 폭 */
+      max-height: 90vh;                       /* 화면을 벗어나지 않도록 세로 제한 */
+      background: #FFFFFF;
+      border-radius: 20px;
+      box-shadow: 0 16px 40px rgba(45, 36, 30, 0.24);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;                       /* 둥근 테두리 안쪽 컨텐츠 깔끔하게 절단 */
+      transform: scale(0.94) translateY(12px);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* 활성화 시 부드러운 확대(Pop-up) 효과 */
+    .potato-modal-overlay.is-active .potato-modal-container {
+      transform: scale(1) translateY(0);
+    }
+
+    /* 우측 상단 닫기(X) 버튼 (이미지 위에서도 잘 보이도록 반투명 원형 처리) */
+    .btn-modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 36px;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      z-index: 10;
+      color: #FFFFFF;
+      font-size: 18px;
+      font-weight: 300;
+      line-height: 1;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+
+    .btn-modal-close:hover {
+      background: rgba(0, 0, 0, 0.7);
+      transform: scale(1.08);
+    }
+
+    /* ==========================================================================
+       [2. 상단 절반: 상품 이미지 영역]
+       - 꽉 채우는 cover 비율, 320px~360px 반응형 높이
+       ========================================================================== */
+    .product-image-box {
+      position: relative;
+      width: 100%;
+      height: clamp(300px, 42vh, 360px);     /* 최소 300px ~ 최대 360px 반응형 높이 */
+      background-color: #EDE7E1;             /* 이미지 로딩 전 플레이스홀더 색상 */
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .product-image-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;                     /* 이미지가 찌그러지지 않고 영역을 시원하게 채움 */
+      display: block;
+      transition: transform 0.3s ease;
+    }
+
+    /* 스크롤 가능한 본문 영역 (이미지 제외한 하단 전체) */
+    .modal-scrollable-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px 24px 16px 24px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* 스크롤바 미려한 스타일 */
+    .modal-scrollable-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .modal-scrollable-body::-webkit-scrollbar-thumb {
+      background-color: #D3C7BD;
+      border-radius: 3px;
+    }
+
+    /* ==========================================================================
+       [3. 하단 컨텐츠 (순서 엄수)]
+       1) 판매 상태 배지
+       2) 카테고리
+       3) 상품명
+       4) 판매 위치
+       5) 업로드 시간
+       6) 가격
+       7) 상품 설명
+       ========================================================================== */
+    /* 1) & 2) 상태 배지 및 카테고리 행 */
+    .product-meta-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    /* 판매 상태 배지 */
+    .product-status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
+    }
+
+    .product-status-badge.status-selling {
+      background-color: var(--badge-selling-bg);
+      color: var(--badge-selling-text);
+      border: 1px solid rgba(46, 125, 50, 0.2);
+    }
+
+    .product-status-badge.status-reserved {
+      background-color: var(--badge-reserved-bg);
+      color: var(--badge-reserved-text);
+      border: 1px solid rgba(180, 83, 9, 0.2);
+    }
+
+    .product-status-badge.status-sold {
+      background-color: var(--badge-sold-bg);
+      color: var(--badge-sold-text);
+      border: 1px solid rgba(107, 114, 128, 0.2);
+    }
+
+    /* 카테고리 */
+    .product-category {
+      font-size: 13px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    /* 3) 상품명 (굵고 눈에 띄는 폰트) */
+    .product-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.4;
+      margin-bottom: 8px;
+      word-break: keep-all;                  /* 한글 단어 끊김 방지 */
+    }
+
+    /* 4) 판매 위치 & 5) 업로드 시간 (메타 행) */
+    .product-sub-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .product-location {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .product-sub-info .separator-dot {
+      display: inline-block;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background-color: #C5BCB3;
+    }
+
+    .product-time-ago {
+      color: var(--text-muted);
+    }
+
+    /* 6) 가격 (크고 굵은 금액 강조) */
+    .product-price-box {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--potato-border);
+    }
+
+    .product-price {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--potato-primary);
+      letter-spacing: -0.5px;
+    }
+
+    /* 7) 상품 설명 (긴 텍스트 줄바꿈 보존 및 가독성 높은 여백) */
+    .product-description-wrap {
+      margin-bottom: 24px;
+    }
+
+    .product-description-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .product-description-text {
+      font-size: 15px;
+      line-height: 1.65;
+      color: #4A3E35;
+      white-space: pre-line;                 /* 긴 글의 줄바꿈(\n)을 온전히 반영 */
+      word-break: break-word;                /* 가로 넘침 방지 */
+    }
+
+    /* ==========================================================================
+       [4. 판매자 정보 섹션]
+       - 프로필 아바타, 닉네임, 판매 지역, '매너온도 37.5℃ 🥔' 디테일
+       ========================================================================== */
+    .seller-profile-card {
+      background-color: var(--potato-bg-light);
+      border: 1px solid var(--potato-border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .seller-left-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 원형 아바타 */
+    .seller-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      background-color: #E2D7CC;
+    }
+
+    .seller-user-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* 판매자 닉네임 */
+    .seller-nickname {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* 판매 지역 */
+    .seller-region {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    /* 매너온도 귀여운 디테일 박스 */
+    .seller-manner-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      min-width: 95px;
+    }
+
+    .manner-temp-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .manner-temp-value {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--potato-primary);
+    }
+
+    .manner-potato-icon {
+      font-size: 15px;
+    }
+
+    /* 매너온도 게이지 프로그레스 바 */
+    .manner-progress-track {
+      width: 80px;
+      height: 5px;
+      background-color: #E5DCD2;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .manner-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #F59E0B, var(--potato-primary));
+      border-radius: 3px;
+      width: 50%; /* JS로 동적 조정 */
+      transition: width 0.4s ease;
+    }
+
+    /* ==========================================================================
+       [5. 최하단 액션 버튼 영역 (하단 고정 바)]
+       - [관심 추가 ♡] 버튼
+       - [채팅 시작하기] 버튼 (포테이토 브라운 강조)
+       ========================================================================== */
+    .modal-bottom-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 20px;
+      background-color: #FFFFFF;
+      border-top: 1px solid var(--potato-border);
+      box-shadow: 0 -4px 14px rgba(45, 36, 30, 0.04);
+      flex-shrink: 0;
+    }
+
+    /* [관심 추가 ♡] 버튼 */
+    .btn-action-like {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #FFFFFF;
+      border: 1.5px solid var(--potato-border);
+      color: var(--text-sub);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-action-like:hover {
+      background-color: #FAF6F1;
+      border-color: #D3C3B2;
+      color: var(--potato-primary);
+    }
+
+    /* 관심 활성화 상태 */
+    .btn-action-like.is-liked {
+      background-color: #FDF2F2;
+      border-color: #FCA5A5;
+      color: #E11D48;
+    }
+
+    .like-heart-icon {
+      font-size: 17px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .btn-action-like.is-liked .like-heart-icon {
+      transform: scale(1.15);
+    }
+
+    /* [채팅 시작하기] 버튼 */
+    .btn-action-chat {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background-color: var(--potato-primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 13px 18px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(139, 90, 43, 0.28);
+    }
+
+    .btn-action-chat:hover {
+      background-color: var(--potato-primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(139, 90, 43, 0.35);
+    }
+
+    .btn-action-chat:active {
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 테스트용 화면 컨테이너 (실제 적용 시에는 필요 없으며 테스트 시 시연용입니다) -->
+  <div class="demo-container">
+    <h2 class="demo-title">🥔 감자마켓 모달 테스트 룸</h2>
+    <p class="demo-desc">
+      아래 버튼을 누르면 상태별(판매중, 예약중, 거래완료) 상품 상세 모달이 뜹니다.<br>
+      오버레이 어둡게 처리, 닫기(X), 바깥 영역 클릭 및 ESC 키 닫기가 지원됩니다.
+    </p>
+    <div class="demo-btn-group">
+      <button type="button" class="btn-open-demo" onclick="openDemoSample(1)">샘플 1 (판매중: 닌텐도)</button>
+      <button type="button" class="btn-open-demo" onclick="openDemoSample(2)">샘플 2 (예약중: 고구마 호박)</button>
+      <button type="button" class="btn-open-demo" onclick="openDemoSample(3)">샘플 3 (거래완료: 아이패드)</button>
+    </div>
+  </div>
+
+
+  <!-- ==========================================================================
+       [화면 2] 상품 상세 팝업 (모달) HTML 구조 조각
+       ========================================================================== -->
+  <div id="productDetailModal" class="potato-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="potato-modal-container">
+      
+      <!-- 우측 상단 닫기 (X) 버튼 -->
+      <button type="button" class="btn-modal-close" id="btnModalClose" aria-label="모달 닫기">✕</button>
+
+      <!-- [상단 절반]: 상품 이미지 영역 (320px~360px 반응형) -->
+      <div class="product-image-box">
+        <img id="modalProductImg" src="" alt="상품 대표 이미지">
+      </div>
+
+      <!-- [중간 스크롤 영역]: 상세 정보 및 판매자 정보 -->
+      <div class="modal-scrollable-body">
+        
+        <!-- 하단 컨텐츠 1) 판매 상태 배지 & 2) 카테고리 -->
+        <div class="product-meta-header">
+          <span id="modalProductBadge" class="product-status-badge status-selling">판매중</span>
+          <span id="modalProductCategory" class="product-category">카테고리</span>
+        </div>
+
+        <!-- 하단 컨텐츠 3) 상품명 -->
+        <h3 id="modalProductTitle" class="product-title">상품 제목이 여기에 표시됩니다.</h3>
+
+        <!-- 하단 컨텐츠 4) 판매 위치 & 5) 업로드 시간 -->
+        <div class="product-sub-info">
+          <span class="product-location">
+            📍 <span id="modalProductLocation">동네 이름</span>
+          </span>
+          <span class="separator-dot"></span>
+          <span id="modalProductTimeAgo" class="product-time-ago">방금 전</span>
+        </div>
+
+        <!-- 하단 컨텐츠 6) 가격 -->
+        <div class="product-price-box">
+          <span id="modalProductPrice" class="product-price">0원</span>
+        </div>
+
+        <!-- 하단 컨텐츠 7) 상품 설명 (긴 텍스트 줄바꿈 보존) -->
+        <div class="product-description-wrap">
+          <h4 class="product-description-title">상품 설명</h4>
+          <p id="modalProductDescription" class="product-description-text">
+            상품 설명 내용이 여기에 표시됩니다.
+          </p>
+        </div>
+
+        <!-- [판매자 정보 섹션] -->
+        <div class="seller-profile-card">
+          <div class="seller-left-info">
+            <!-- 프로필 이미지 (원형 아바타) -->
+            <img id="modalSellerAvatar" class="seller-avatar" src="" alt="판매자 프로필">
+            
+            <div class="seller-user-meta">
+              <!-- 판매자 닉네임 -->
+              <div id="modalSellerNickname" class="seller-nickname">판매자닉네임</div>
+              <!-- 판매 지역 -->
+              <div id="modalSellerRegion" class="seller-region">판매 지역 정보</div>
+            </div>
+          </div>
+
+          <!-- '매너온도 37.5℃ 🥔' 디테일 -->
+          <div class="seller-manner-box">
+            <div class="manner-temp-row">
+              <span id="modalSellerMannerTemp" class="manner-temp-value">36.5℃</span>
+              <span class="manner-potato-icon">🥔</span>
+            </div>
+            <!-- 매너온도 게이지 바 -->
+            <div class="manner-progress-track" title="매너온도 게이지">
+              <div id="modalMannerProgressBar" class="manner-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- // .modal-scrollable-body 끝 -->
+
+      <!-- [최하단 액션 버튼 영역] -->
+      <div class="modal-bottom-actions">
+        <!-- [관심 추가 ♡] 버튼 -->
+        <button type="button" class="btn-action-like" id="btnModalLike" aria-pressed="false">
+          <span class="like-heart-icon" id="likeHeartIcon">♡</span>
+          <span id="likeBtnText">관심</span>
+          <span id="likeCountText">(0)</span>
+        </button>
+
+        <!-- [채팅 시작하기] 버튼 (포테이토 브라운 강조) -->
+        <button type="button" class="btn-action-chat" id="btnModalChat">
+          💬 채팅 시작하기
+        </button>
+      </div>
+
+    </div> <!-- // .potato-modal-container 끝 -->
+  </div> <!-- // .potato-modal-overlay 끝 -->
+
+
+  <!-- ==========================================================================
+       [JavaScript 모달 동작 & 데이터 바인딩 로직]
+       초보자 친화적 상세 주석 포함
+       ========================================================================== -->
+  <script>
+    /**
+     * [모달 요소 참조 변수 선언]
+     * 자주 사용하는 DOM 요소들을 미리 변수에 담아두어 코드 가독성과 성능을 높입니다.
+     */
+    const productModal = document.getElementById('productDetailModal');
+    const modalContainer = productModal.querySelector('.potato-modal-container');
+    const btnModalClose = document.getElementById('btnModalClose');
+
+    // 상품 정보 요소들
+    const modalProductImg = document.getElementById('modalProductImg');
+    const modalProductBadge = document.getElementById('modalProductBadge');
+    const modalProductCategory = document.getElementById('modalProductCategory');
+    const modalProductTitle = document.getElementById('modalProductTitle');
+    const modalProductLocation = document.getElementById('modalProductLocation');
+    const modalProductTimeAgo = document.getElementById('modalProductTimeAgo');
+    const modalProductPrice = document.getElementById('modalProductPrice');
+    const modalProductDescription = document.getElementById('modalProductDescription');
+
+    // 판매자 정보 요소들
+    const modalSellerAvatar = document.getElementById('modalSellerAvatar');
+    const modalSellerNickname = document.getElementById('modalSellerNickname');
+    const modalSellerRegion = document.getElementById('modalSellerRegion');
+    const modalSellerMannerTemp = document.getElementById('modalSellerMannerTemp');
+    const modalMannerProgressBar = document.getElementById('modalMannerProgressBar');
+
+    // 하단 액션 버튼들
+    const btnModalLike = document.getElementById('btnModalLike');
+    const likeHeartIcon = document.getElementById('likeHeartIcon');
+    const likeBtnText = document.getElementById('likeBtnText');
+    const likeCountText = document.getElementById('likeCountText');
+    const btnModalChat = document.getElementById('btnModalChat');
+
+    // 현재 모달에 바인딩된 상품의 임시 상태(관심 여부 및 채팅 연동용)
+    let currentProductData = null;
+
+    /**
+     * [함수 1] 모달 열기 함수 (openProductModal)
+     * 상품 객체(data)를 받아 화면에 데이터를 채운 뒤 모달을 화면에 띄웁니다.
+     * @param {Object} productData - 상품 상세 정보 객체
+     */
+    function openProductModal(productData) {
+      if (!productData) {
+        console.error('표시할 상품 데이터가 없습니다.');
+        return;
+      }
+
+      // 1. 데이터 바인딩 함수 실행
+      bindProductData(productData);
+
+      // 2. 모달 열림 클래스 부여 및 접근성(A11y) 속성 변경
+      productModal.classList.add('is-active');
+      productModal.setAttribute('aria-hidden', 'false');
+
+      // 3. 배경 스크롤 방지 (모달이 켜져 있는 동안 뒷 배경 스크롤 잠금)
+      document.body.style.overflow = 'hidden';
+    }
+
+    /**
+     * [함수 2] 모달 닫기 함수 (closeProductModal)
+     * 모달을 닫고 뒷배경 스크롤을 복원합니다.
+     */
+    function closeProductModal() {
+      productModal.classList.remove('is-active');
+      productModal.setAttribute('aria-hidden', 'true');
+
+      // 배경 스크롤 복원
+      document.body.style.overflow = '';
+    }
+
+    /**
+     * [함수 3] 상품 데이터 바인딩 함수 (bindProductData)
+     * 객체로부터 전달받은 정보들을 각각의 HTML 요소에 꽂아 넣습니다.
+     * @param {Object} data - 바인딩할 상품 데이터
+     */
+    function bindProductData(data) {
+      currentProductData = data;
+
+      // 1) 상단 대표 이미지
+      modalProductImg.src = data.imageUrl || 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=700&auto=format&fit=crop';
+      modalProductImg.alt = data.title || '상품 이미지';
+
+      // 2) 판매 상태 배지 (판매중 / 예약중 / 거래완료 색상 및 문구 처리)
+      modalProductBadge.className = 'product-status-badge'; // 기본 클래스로 리셋
+      if (data.status === 'RESERVED') {
+        modalProductBadge.textContent = '예약중';
+        modalProductBadge.classList.add('status-reserved');
+      } else if (data.status === 'SOLD') {
+        modalProductBadge.textContent = '거래완료';
+        modalProductBadge.classList.add('status-sold');
+      } else {
+        // 기본값: 판매중
+        modalProductBadge.textContent = '판매중';
+        modalProductBadge.classList.add('status-selling');
+      }
+
+      // 3) 카테고리
+      modalProductCategory.textContent = data.category || '기타 중고물품';
+
+      // 4) 상품명
+      modalProductTitle.textContent = data.title || '제목 없음';
+
+      // 5) 판매 위치 & 6) 업로드 시간
+      modalProductLocation.textContent = data.location || '지역 정보 없음';
+      modalProductTimeAgo.textContent = data.timeAgo || '최근';
+
+      // 7) 가격 (원화 쉼표 포맷팅)
+      const formattedPrice = typeof data.price === 'number' 
+        ? data.price.toLocaleString('ko-KR') + '원' 
+        : (data.price || '가격 협의');
+      modalProductPrice.textContent = formattedPrice;
+
+      // 8) 상품 설명 (줄바꿈이 있는 텍스트)
+      modalProductDescription.textContent = data.description || '작성된 상품 설명이 없습니다.';
+
+      // 9) 판매자 정보
+      modalSellerAvatar.src = data.seller?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop';
+      modalSellerAvatar.alt = (data.seller?.nickname || '판매자') + '님의 프로필';
+      modalSellerNickname.textContent = data.seller?.nickname || '익명의 감자';
+      modalSellerRegion.textContent = data.seller?.region || data.location || '동네 인증 완료';
+
+      // 10) 매너온도 계산 및 게이지 표시 (예: 37.5℃)
+      const mannerTemp = data.seller?.mannerTemp !== undefined ? data.seller.mannerTemp : 36.5;
+      modalSellerMannerTemp.textContent = `${mannerTemp.toFixed(1)}℃`;
+
+      // 매너온도 게이지 바 계산: 기본 36.5도를 기준선으로 0도~100도 사이 백분율 적용
+      const percent = Math.min(Math.max((mannerTemp / 60) * 100, 5), 100);
+      modalMannerProgressBar.style.width = `${percent}%`;
+
+      // 11) 관심 버튼 초기 상태 설정
+      const isLiked = Boolean(data.isLiked);
+      const likesCount = data.likesCount || 0;
+      updateLikeButtonUI(isLiked, likesCount);
+    }
+
+    /**
+     * [함수 4] 관심(좋아요) 버튼 UI 갱신 헬퍼 함수
+     */
+    function updateLikeButtonUI(isLiked, count) {
+      if (isLiked) {
+        btnModalLike.classList.add('is-liked');
+        likeHeartIcon.textContent = '♥';
+        btnModalLike.setAttribute('aria-pressed', 'true');
+      } else {
+        btnModalLike.classList.remove('is-liked');
+        likeHeartIcon.textContent = '♡';
+        btnModalLike.setAttribute('aria-pressed', 'false');
+      }
+      likeCountText.textContent = `(${count})`;
+    }
+
+
+    /* ==========================================================================
+       [이벤트 리스너 등록]
+       사용자 상호작용 (닫기 버튼, 배경 클릭, ESC 키, 관심 누르기, 채팅 누르기)
+       ========================================================================== */
+
+    // 1. 우측 상단 닫기(X) 버튼 클릭 이벤트
+    btnModalClose.addEventListener('click', function() {
+      closeProductModal();
+    });
+
+    // 2. 모달 바깥 배경(오버레이) 클릭 시 닫기
+    productModal.addEventListener('click', function(event) {
+      // 클릭된 대상이 딤 배경(오버레이 자체)인 경우에만 닫습니다. (컨테이너 내부 클릭 시 닫힘 방지)
+      if (event.target === productModal) {
+        closeProductModal();
+      }
+    });
+
+    // 3. 키보드 ESC 키를 눌렀을 때 닫기 (웹 접근성 & 사용자 편의성)
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && productModal.classList.contains('is-active')) {
+        closeProductModal();
+      }
+    });
+
+    // 4. [관심 추가 ♡] 버튼 토글 클릭 이벤트
+    btnModalLike.addEventListener('click', function() {
+      if (!currentProductData) return;
+
+      // 좋아요 토글
+      currentProductData.isLiked = !currentProductData.isLiked;
+      currentProductData.likesCount = (currentProductData.likesCount || 0) + (currentProductData.isLiked ? 1 : -1);
+      if (currentProductData.likesCount < 0) currentProductData.likesCount = 0;
+
+      // UI 즉시 반영
+      updateLikeButtonUI(currentProductData.isLiked, currentProductData.likesCount);
+
+      // (안내 알림 또는 백엔드 API 호출 지점)
+      console.log(`[관심 상태 변경] 상품ID: ${currentProductData.id}, 관심여부: ${currentProductData.isLiked}`);
+    });
+
+    // 5. [채팅 시작하기] 버튼 클릭 이벤트
+    btnModalChat.addEventListener('click', function() {
+      if (!currentProductData) return;
+      alert(`🥔 [${currentProductData.seller?.nickname || '판매자'}]님과의 1:1 감자채팅창으로 이동합니다!`);
+      // 실제 구현 시: location.href = `/chat?productId=${currentProductData.id}&sellerId=${currentProductData.seller?.id}`;
+    });
+
+
+    /* ==========================================================================
+       [테스트용 샘플 데이터 및 데모 실행 함수]
+       ========================================================================== */
+    const mockProducts = {
+      1: {
+        id: 'potato-prod-001',
+        title: '닌텐도 스위치 OLED 화이트 풀박스 (상태 특S급)',
+        category: '디지털기기',
+        price: 320000,
+        status: 'SELLING', // 판매중
+        location: '서울시 마포구 연남동',
+        timeAgo: '2시간 전',
+        imageUrl: 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?w=800&auto=format&fit=crop',
+        description: `작년 말에 구매하고 실사용 10회 미만인 거의 새 제품입니다!\n강화유리 필름 부착되어 있으며 생활기스 전혀 없습니다.\n\n구성품:\n- 본체 및 독, 조이콘, 스트랩, 그립 풀박스\n- 정품 파우치 함께 드립니다.\n연남동 주민센터 앞 직거래 희망해요. 매너거래 부탁드립니다 🥔`,
+        likesCount: 14,
+        isLiked: false,
+        seller: {
+          id: 'user-001',
+          nickname: '포슬포슬이',
+          region: '서울시 마포구 연남동',
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop',
+          mannerTemp: 37.8
+        }
+      },
+      2: {
+        id: 'potato-prod-002',
+        title: '달콤한 해남 꿀밤고구마 & 강원도 햇감자 1박스',
+        category: '식품 / 농산물',
+        price: 18000,
+        status: 'RESERVED', // 예약중
+        location: '서울시 서대문구 신촌동',
+        timeAgo: '4시간 전',
+        imageUrl: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=800&auto=format&fit=crop',
+        description: `시골 부모님께서 직접 농사지으신 달콤하고 포슬포슬한 햇감자와 고구마입니다.\n양이 너무 많아 1박스 저렴하게 나눔 판매합니다.\n현재 예약자분과 조율 중입니다.`,
+        likesCount: 5,
+        isLiked: true,
+        seller: {
+          id: 'user-002',
+          nickname: '감자마스터',
+          region: '서울시 서대문구 신촌동',
+          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop',
+          mannerTemp: 42.0
+        }
+      },
+      3: {
+        id: 'potato-prod-003',
+        title: '아이패드 에어 5세대 M1 64GB 스페이스그레이',
+        category: '디지털기기',
+        price: 580000,
+        status: 'SOLD', // 거래완료
+        location: '서울시 마포구 망원동',
+        timeAgo: '1일 전',
+        imageUrl: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=800&auto=format&fit=crop',
+        description: `영상 시청용으로만 사용하여 배터리 효율 98%입니다.\n직거래로 빠르게 거래 완료되었습니다. 감사합니다!`,
+        likesCount: 28,
+        isLiked: false,
+        seller: {
+          id: 'user-003',
+          nickname: '햇감자도둑',
+          region: '서울시 마포구 망원동',
+          avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop',
+          mannerTemp: 36.5
+        }
+      }
+    };
+
+    /**
+     * 데모 버튼 클릭 핸들러
+     */
+    function openDemoSample(sampleId) {
+      const data = mockProducts[sampleId];
+      openProductModal(data);
+    }
+  </script>
+</body>
+</html>

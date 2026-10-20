@@ -1,0 +1,18 @@
+# 환경변수 및 민감 정보 파일 (절대 커밋 금지)
+.env
+.env.local
+.env.*.local
+
+# 운영체제 및 에디터 임시 파일
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# 종속성 모듈
+node_modules/
+
+# Antigravity 로컬 설정 및 캐시
+.agents/
+.agent/

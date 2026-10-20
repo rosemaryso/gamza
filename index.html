@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>감자마켓 - 따뜻한 우리 동네 중고거래</title>
+  <!-- 폰트어썸 아이콘 CDN (검색, 글쓰기 등 아이콘 표시용) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- 감자 테마 통합 스타일시트 -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase 공식 자바스크립트 클라이언트 CDN (빌드 도구 없이 브라우저에서 바로 사용) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- =====================================================================
+       [화면 1] 상단 네비게이션 헤더 영역
+       - 로고, 실시간 상품명 검색창, [글쓰기] 버튼, [로그인] 버튼(자리용)
+       ===================================================================== -->
+  <header class="header">
+    <div class="header-container">
+      <!-- 1. 감자마켓 로고 (클릭 시 모든 검색/필터 초기화) -->
+      <a href="#" class="logo" onclick="resetFilters(event)" title="감자마켓 홈으로 이동">
+        <span class="logo-icon">🥔</span>
+        <span class="logo-title">감자</span>
+      </a>
+
+      <!-- 2. 실시간 상품 검색창 -->
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="어떤 감자를 찾고 계신가요? (상품명 검색)" 
+          autocomplete="off"
+        >
+      </div>
+
+      <!-- 3. 상단 우측 액션 버튼 그룹 -->
+      <div class="nav-actions">
+        <!-- 글쓰기 버튼 (화면 3 글쓰기 모달 열기) -->
+        <button type="button" class="btn btn-write" id="btnOpenWrite" onclick="openWriteModal()">
+          <i class="fa-solid fa-pen"></i>
+          <span>글쓰기</span>
+        </button>
+        <!-- 로그인 버튼 (현재는 자리만 마련) -->
+        <button type="button" class="btn btn-login" id="btnLogin" onclick="handleLoginClick()">
+          <span>로그인</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+
+  <!-- =====================================================================
+       [화면 1] 메인 콘텐츠 본문
+       - 카테고리 필터, 거래 가능만 보기 토글, 상품 카드 목록 그리드
+       ===================================================================== -->
+  <main class="main-container">
+    
+    <!-- 카테고리 탭 & '거래 가능만 보기' 토글 스위치 -->
+    <section class="filter-section">
+      <!-- 카테고리 버튼 목록 -->
+      <div class="category-list" id="categoryList">
+        <button type="button" class="category-btn active" data-category="전체">전체</button>
+        <button type="button" class="category-btn" data-category="디지털기기">디지털기기</button>
+        <button type="button" class="category-btn" data-category="가구/인테리어">가구/인테리어</button>
+        <button type="button" class="category-btn" data-category="의류">의류</button>
+        <button type="button" class="category-btn" data-category="생활가전">생활가전</button>
+        <button type="button" class="category-btn" data-category="도서/티켓">도서/티켓</button>
+        <button type="button" class="category-btn" data-category="기타">기타</button>
+      </div>
+
+      <!-- 거래 가능만 보기 토글 버튼 -->
+      <div class="toggle-wrapper">
+        <label class="switch-label" for="availableToggle">
+          <span class="toggle-text">거래 가능만 보기</span>
+          <div class="switch">
+            <input type="checkbox" id="availableToggle" onchange="handleToggleChange(event)">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <!-- 현재 조회된 상품 수 표시 안내 -->
+    <section class="result-info">
+      <span class="total-count-text">총 <strong id="totalCount">0</strong>개의 감자 상품</span>
+    </section>
+
+    <!-- 상품 카드 그리드 영역 (Supabase 클라우드 DB에서 불러온 상품들이 동적으로 채워집니다) -->
+    <section class="product-grid" id="productGrid">
+      <!-- 데이터 로딩 중 표시될 초기 플레이스홀더 안내 -->
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-sub);">
+        🥔 수파베이스 클라우드 데이터베이스에서 상품 목록을 불러오는 중입니다...
+      </div>
+    </section>
+
+    <!-- 검색어나 필터 조건에 맞는 상품이 없을 때 표시되는 빈 상태(Empty State) -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <span class="empty-icon">🥔💨</span>
+      <h3 class="empty-title">찾으시는 상품이 없어요!</h3>
+      <p class="empty-desc">검색어를 바꾸거나 필터를 초기화해 보세요.</p>
+    </div>
+
+  </main>
+
+
+  <!-- =====================================================================
+       [화면 2] 상품 상세 팝업 (모달)
+       - 카드를 누르면 뜨는 팝업
+       - 상단 절반 이미지, 판매상태, 카테고리, 상품명, 위치, 시간, 가격, 설명
+       - 판매자 정보(프로필, 닉네임, 지역, 매너온도)
+       - 하단 [관심 추가], [채팅 시작하기]
+       ===================================================================== -->
+  <div id="productDetailModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-container detail-modal-container">
+      
+      <!-- 우측 상단 닫기(X) 버튼 -->
+      <button type="button" class="btn-detail-close" onclick="closeProductModal()" aria-label="상세창 닫기">✕</button>
+
+      <!-- [상단 절반]: 상품 이미지 영역 (화면의 위쪽 절반을 시원하게 채움) -->
+      <div class="detail-image-box">
+        <img id="modalProductImg" src="" alt="상품 대표 이미지">
+      </div>
+
+      <!-- [하단 절반]: 상품 상세 내용 및 판매자 정보 (스크롤 가능) -->
+      <div class="detail-content-scroll">
+        
+        <!-- 1) 판매 상태 배지 & 2) 카테고리 -->
+        <div class="detail-meta-row">
+          <span id="modalProductBadge" class="status-badge selling">판매중</span>
+          <span id="modalProductCategory" class="detail-category-text">디지털기기</span>
+        </div>
+
+        <!-- 3) 상품명 -->
+        <h2 id="modalProductTitle" class="detail-product-title">상품 제목</h2>
+
+        <!-- 4) 판매 위치 & 5) 업로드 시간 -->
+        <div class="detail-sub-meta">
+          <span class="detail-location"><i class="fa-solid fa-location-dot"></i> <span id="modalProductLocation">역삼동</span></span>
+          <span class="dot-separator">•</span>
+          <span id="modalProductTimeAgo" class="detail-time">방금 전</span>
+        </div>
+
+        <!-- 6) 가격 -->
+        <div class="detail-price-box">
+          <span id="modalProductPrice" class="detail-price-text">0원</span>
+        </div>
+
+        <!-- 7) 상품 설명 (여러 줄 텍스트 줄바꿈 유지) -->
+        <div class="detail-description-section">
+          <h4 class="detail-section-title">상품 설명</h4>
+          <p id="modalProductDescription" class="detail-description-text">
+            상품 설명이 여기에 표시됩니다.
+          </p>
+        </div>
+
+        <!-- 판매자 정보 섹션 (닉네임, 프로필 이미지, 지역, 매너온도) -->
+        <div class="seller-card">
+          <div class="seller-info-left">
+            <img id="modalSellerAvatar" class="seller-avatar-img" src="" alt="판매자 프로필">
+            <div class="seller-text-info">
+              <span id="modalSellerNickname" class="seller-nickname">판매자닉네임</span>
+              <span id="modalSellerRegion" class="seller-region">서울시 강남구 역삼동</span>
+            </div>
+          </div>
+          <div class="seller-manner-right">
+            <div class="manner-text-row">
+              <span id="modalSellerMannerTemp" class="manner-number">36.5℃</span>
+              <span class="manner-icon">🥔</span>
+            </div>
+            <div class="manner-bar-track" title="매너온도">
+              <div id="modalMannerProgressBar" class="manner-bar-fill"></div>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- // .detail-content-scroll 끝 -->
+
+      <!-- 맨 아래 액션 버튼 ([관심 추가], [채팅 시작하기]) -->
+      <div class="detail-bottom-actions">
+        <button type="button" class="btn-like" id="btnDetailLike" onclick="toggleLike()">
+          <span id="likeHeartIcon">♡</span>
+          <span>관심</span>
+          <span id="likeCountText">(0)</span>
+        </button>
+        <button type="button" class="btn-chat" onclick="handleChatClick()">
+          <i class="fa-solid fa-comments"></i> 채팅 시작하기
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       [화면 3] 상품 등록 글쓰기 팝업 (모달)
+       - 이미지, 상품명, 카테고리, 가격, 상세설명, 거래동네, 판매상태 입력
+       - 맨 아래 [작성 완료] 버튼 (누르면 Supabase DB에 실제 저장!)
+       ===================================================================== -->
+  <div id="writeModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="writeModalTitle">
+    <div class="modal-container write-modal-container">
+      
+      <!-- 1. 글쓰기 모달 헤더 -->
+      <div class="modal-header">
+        <h2 id="writeModalTitle" class="modal-title">내 물건 팔기 🥔</h2>
+        <button type="button" class="btn-close-simple" onclick="closeWriteModal()" aria-label="닫기">
+          &times;
+        </button>
+      </div>
+
+      <!-- 2. 글쓰기 입력 폼 -->
+      <form id="writeProductForm" class="write-form" onsubmit="handleProductSubmit(event)">
+        
+        <!-- 상품 이미지 입력 및 미리보기 -->
+        <div class="form-group">
+          <label for="productImage" class="form-label">상품 이미지</label>
+          <input 
+            type="url" 
+            id="productImage" 
+            class="form-input" 
+            placeholder="이미지 주소(URL)를 입력해주세요" 
+            oninput="handleImagePreview(this.value)"
+          />
+          
+          <!-- 추천 이미지 프리셋 버튼 -->
+          <div class="preset-wrapper">
+            <span class="preset-label">추천 이미지:</span>
+            <button type="button" class="preset-tag" onclick="applyImagePreset('https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=600&auto=format&fit=crop&q=80')">🥔 햇감자</button>
+            <button type="button" class="preset-tag" onclick="applyImagePreset('https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=600&auto=format&fit=crop&q=80')">📱 디지털</button>
+            <button type="button" class="preset-tag" onclick="applyImagePreset('https://images.unsplash.com/photo-1532372320572-cda25653a26d?w=600&auto=format&fit=crop&q=80')">🪑 가구</button>
+          </div>
+
+          <!-- 이미지 미리보기 박스 -->
+          <div class="preview-box">
+            <img id="imagePreview" src="https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=600&auto=format&fit=crop&q=80" alt="이미지 미리보기" />
+          </div>
+        </div>
+
+        <!-- 상품명 (필수) -->
+        <div class="form-group">
+          <label for="productTitle" class="form-label">상품명 <span class="required">*</span></label>
+          <input 
+            type="text" 
+            id="productTitle" 
+            class="form-input" 
+            placeholder="글 제목을 입력해주세요" 
+            maxlength="50"
+            required 
+          />
+        </div>
+
+        <!-- 카테고리 (선택) -->
+        <div class="form-group">
+          <label for="productCategory" class="form-label">카테고리 <span class="required">*</span></label>
+          <select id="productCategory" class="form-select" required>
+            <option value="" disabled selected>카테고리를 선택해주세요</option>
+            <option value="디지털기기">디지털기기</option>
+            <option value="가구/인테리어">가구/인테리어</option>
+            <option value="의류">의류</option>
+            <option value="생활가전">생활가전</option>
+            <option value="도서/티켓">도서/티켓</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+
+        <!-- 가격 (0원이면 나눔) -->
+        <div class="form-group">
+          <div class="label-badge-row">
+            <label for="productPrice" class="form-label">가격 (원) <span class="required">*</span></label>
+            <span id="freeShareBadge" class="free-share-badge hidden">🧡 따뜻한 무료 나눔 상품이에요!</span>
+          </div>
+          <div class="price-input-box">
+            <input 
+              type="number" 
+              id="productPrice" 
+              class="form-input" 
+              placeholder="가격을 입력해주세요 (0원 입력 시 나눔)" 
+              min="0" 
+              step="100" 
+              oninput="handlePriceChange(this.value)"
+              required 
+            />
+            <span class="currency-tag">원</span>
+          </div>
+        </div>
+
+        <!-- 거래 동네 -->
+        <div class="form-group">
+          <label for="productLocation" class="form-label">거래 동네 <span class="required">*</span></label>
+          <input 
+            type="text" 
+            id="productLocation" 
+            class="form-input" 
+            placeholder="예: 역삼동, 마포구 연남동" 
+            required 
+          />
+        </div>
+
+        <!-- 판매 상태 선택 (판매중 / 예약중 / 거래 완료) -->
+        <div class="form-group">
+          <label class="form-label">판매 상태</label>
+          <div class="status-choice-group">
+            <label class="radio-item">
+              <input type="radio" name="productStatus" value="판매중" checked />
+              <span>판매중</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="productStatus" value="예약중" />
+              <span>예약중</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="productStatus" value="거래완료" />
+              <span>거래 완료</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 자세한 설명 -->
+        <div class="form-group">
+          <label for="productDescription" class="form-label">자세한 설명</label>
+          <textarea 
+            id="productDescription" 
+            class="form-textarea" 
+            rows="4" 
+            placeholder="상품 상태(구매 시기, 사용감, 하자 유무 등)를 자세히 적어주시면 더 신뢰받는 거래가 됩니다 🥔"
+          ></textarea>
+        </div>
+
+        <!-- 3. 맨 아래 [작성 완료] 버튼 -->
+        <div class="modal-footer">
+          <button type="submit" id="btnSubmitProduct" class="btn-submit-full">
+            작성 완료 🥔
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- 통합 프론트엔드 자바스크립트 (Supabase 실시간 클라우드 DB 연동) -->
+  <script src="app.js"></script>
+</body>
+</html>
